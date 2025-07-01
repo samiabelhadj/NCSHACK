@@ -1,10 +1,9 @@
 import { Plus, Trash, Edit, Loader } from "lucide-react";
 import { useState, useEffect } from "react";
 
-const API_BASE_URL = "https://ncs-rv1s.onrender.com";
+const API_BASE_URL = "https://ncs-bpb4.onrender.com";
 
 const Users = () => {
-  // sdg
   const [userList, setUserList] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
@@ -12,9 +11,7 @@ const Users = () => {
     lastName: "",
     email: "",
     password: "",
-    role: "admin",
-    points: "",
-    status: "Active",
+    role: "user", // Changed default to "user"Q
   });
   const [search, setSearch] = useState("");
   const [editUserId, setEditUserId] = useState(null);
@@ -25,42 +22,48 @@ const Users = () => {
   const authToken =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJkc2xrTnhsY2tzbmR4bHZrbnNmQGdtYWlsLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1MTM2MDgwMSwiZXhwIjoxNzUxNDQ3MjAxfQ.icW5oe6WXImYodjoMt9_ByN87LVRrMikkLuRSwxi3Gk";
 
-  // Fetch users from backend (you'll need to implement this endpoint)
+  // Helper function to get points value from user object
+  const getUserPoints = (user) => {
+    // Try different possible field names for points
+    return user.pointBalance || 0;
+  };
+
+  // Fetch users from backend
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      // Note: You'll need to implement a GET endpoint to fetch users
-      // const response = await fetch(`${API_BASE_URL}/users`, {
-      //   headers: {
-      //     'Authorization': `Bearer ${authToken}`,
-      //     'Content-Type': 'application/json'
-      //   }
-      // });
-      // const data = await response.json();
-      // setUserList(data);
+      console.log("Fetching users...");
 
-      // For now, using mock data until you implement the GET endpoint
-      setUserList([
-        {
-          id: 1,
-          firstName: "John",
-          lastName: "Doe",
-          email: "john.doe@example.com",
-          points: 1200,
-          status: "Active",
+      const response = await fetch(`${API_BASE_URL}/user/all`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
         },
-        {
-          id: 2,
-          firstName: "Jane",
-          lastName: "Smith",
-          email: "jane.smith@example.com",
-          points: 850,
-          status: "Active",
-        },
-      ]);
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Users fetched successfully:", data);
+      console.log(response.data);
+      console.log("Sample user object:", data.data?.[0]); // Debug: log first user to see field names
+
+      // Handle the API response structure: {message: '...', total: 24, data: Array(10)}
+      if (data && Array.isArray(data.data)) {
+        setUserList(data.data);
+        console.log(Array.isArray(data.data));
+        console.log("wfxvbwvcbgwc", data.data);
+      }
     } catch (err) {
-      setError("Failed to fetch users");
-      console.error(err);
+      console.error("Error fetching users:", err);
+      setError("Failed to fetch users. Using fallback data.");
+
+      // Fallback to mock data if API fails
+      // eslint-disable-next-line no-undef
+      //setUserList(data.data);
     } finally {
       setLoading(false);
     }
@@ -77,6 +80,8 @@ const Users = () => {
 
   const createUser = async (userData) => {
     try {
+      console.log("Creating user with data:", userData);
+
       const response = await fetch(`${API_BASE_URL}/user/create`, {
         method: "POST",
         headers: {
@@ -92,11 +97,30 @@ const Users = () => {
         }),
       });
 
+      console.log("Create user response status:", response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Create user error:", errorData);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${
+            errorData.message || "Unknown error"
+          }`
+        );
       }
 
-      return true;
+      // Handle both cases: API returns data or empty response
+      let result;
+      try {
+        result = await response.json();
+        console.log("User created successfully with response:", result);
+      } catch (jsonError) {
+        // If no JSON response, create a mock result
+        console.log("No JSON response, user likely created successfully");
+        result = { success: true };
+      }
+
+      return result;
     } catch (err) {
       console.error("Error creating user:", err);
       throw err;
@@ -105,7 +129,9 @@ const Users = () => {
 
   const updateUser = async (userId, userData) => {
     try {
-      const response = await fetch(`user/${userId}`, {
+      console.log("Updating user:", userId, "with data:", userData);
+
+      const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -116,11 +142,21 @@ const Users = () => {
         }),
       });
 
+      console.log("Update user response status:", response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Update user error:", errorData);
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${
+            errorData.message || "Unknown error"
+          }`
+        );
       }
 
-      return true;
+      const result = await response.json().catch(() => ({}));
+      console.log("User updated successfully:", result);
+      return result;
     } catch (err) {
       console.error("Error updating user:", err);
       throw err;
@@ -129,6 +165,18 @@ const Users = () => {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
+
+    // Validate form data
+    if (!form.email || !form.email.trim()) {
+      setError("Email is required");
+      return;
+    }
+
+    if (!editUserId && (!form.firstName || !form.lastName || !form.password)) {
+      setError("All fields are required for new users");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -142,40 +190,64 @@ const Users = () => {
               ? {
                   ...user,
                   email: form.email,
-                  points: Number(form.points),
-                  status: form.status,
+                  pointBalance: Number(form.points) || 0,
                 }
               : user
           )
         );
       } else {
         // Create new user
-        await createUser(form);
-        // Add to local state (in a real app, you'd refetch from server)
+        const result = await createUser(form);
+        console.log("User creation result:", result);
+
+        // Create the new user object immediately
         const newUser = {
-          id: Date.now(), // temporary ID
+          id: result?.id || result?.user?.id || Date.now(),
           firstName: form.firstName,
           lastName: form.lastName,
           email: form.email,
-          points: Number(form.points) || 0,
-          status: form.status,
+          pointBalance: Number(form.points) || 0,
+          role: form.role,
         };
-        setUserList([...userList, newUser]);
+
+        // Add to local state immediately for better UX
+        setUserList((prevList) => {
+          const currentList = Array.isArray(prevList) ? prevList : [];
+          return [...currentList, newUser];
+        });
+
+        // Try to refresh the user list to sync with backend (but don't wait for it)
+        setTimeout(async () => {
+          try {
+            await fetchUsers();
+            console.log("User list refreshed successfully");
+          } catch (refreshError) {
+            console.error("Failed to refresh user list:", refreshError);
+            // The user is already added to local state, so this is just for sync
+          }
+        }, 1000); // Small delay to allow backend to process
       }
 
+      // Clear form and close modal
       setShowModal(false);
       setForm({
         firstName: "",
         lastName: "",
         email: "",
         password: "",
-        role: "admin",
+        role: "user", // Changed default to "user"
         points: "",
-        status: "Active",
       });
       setEditUserId(null);
+      setError(""); // Clear any previous errors
+      console.log("User operation completed successfully");
     } catch (err) {
-      setError(editUserId ? "Failed to update user" : "Failed to create user");
+      console.error("Error in handleAddUser:", err);
+      setError(
+        editUserId
+          ? "Failed to update user"
+          : "Failed to create user. Please check your input and try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -187,9 +259,8 @@ const Users = () => {
       lastName: user.lastName,
       email: user.email,
       password: "", // Don't populate password for security
-      role: "admin",
-      points: user.points,
-      status: user.status,
+      role: user.role || "user",
+      points: getUserPoints(user) || "",
     });
     setEditUserId(user.id);
     setShowModal(true);
@@ -202,19 +273,54 @@ const Users = () => {
       lastName: "",
       email: "",
       password: "",
-      role: "admin",
+      role: "user", // Changed default to "user"
       points: "",
-      status: "Active",
     });
     setEditUserId(null);
     setError("");
   };
 
-  const handleDeleteClick = (userId) => {
+  const handleDeleteClick = async (userId) => {
     if (window.confirm("Are you sure you want to delete this user?")) {
-      setUserList((prevList) => prevList.filter((user) => user.id !== userId));
+      try {
+        // Make API call to delete from database
+        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            // Include authorization token if needed
+            // 'Authorization': `Bearer ${yourAuthToken}`
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to delete user");
+        }
+
+        // Only update the local state if the database deletion was successful
+        setUserList((prevList) =>
+          Array.isArray(prevList)
+            ? prevList.filter((user) => user.id !== userId)
+            : []
+        );
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        // Optionally show an error message to the user
+        alert("Failed to delete user. Please try again.");
+      }
     }
   };
+  // Filter to only show users (not admins)
+  const filteredUsers = Array.isArray(userList)
+    ? userList.filter(
+        (user) =>
+          user.role !== "admin" && // Exclude admins
+          (`${user.firstName} ${user.lastName}`
+            .toLowerCase()
+            .includes(search.toLowerCase()) ||
+            user.email.toLowerCase().includes(search.toLowerCase()))
+      )
+    : [];
 
   return (
     <div>
@@ -225,8 +331,21 @@ const Users = () => {
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">User Management</h1>
+        <h1 className="text-3xl font-bold text-gray-800">
+          User Management (Users Only)
+        </h1>
         <div className="flex space-x-2">
+          <button
+            className="flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
+            onClick={() => fetchUsers()}
+            disabled={loading}
+          >
+            <Loader
+              className={`mr-2 ${loading ? "animate-spin" : ""}`}
+              size={18}
+            />
+            Refresh
+          </button>
           <button
             className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
             onClick={() => setShowModal(true)}
@@ -261,7 +380,7 @@ const Users = () => {
                 {error}
               </div>
             )}
-            <div className="space-y-4">
+            <form onSubmit={handleAddUser} className="space-y-4">
               {!editUserId && (
                 <>
                   <input
@@ -297,8 +416,8 @@ const Users = () => {
                     value={form.role}
                     onChange={handleChange}
                   >
-                    <option value="admin">Admin</option>
                     <option value="user">User</option>
+                    <option value="admin">Admin</option>
                   </select>
                 </>
               )}
@@ -316,18 +435,10 @@ const Users = () => {
                 type="number"
                 name="points"
                 placeholder="Points"
-                value={form.points}
+                value={0}
+                readOnly
                 onChange={handleChange}
               />
-              <select
-                className="w-full border rounded px-3 py-2"
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-              >
-                <option value="Active">Active</option>
-                <option value="Banned">Banned</option>
-              </select>
               <div className="flex justify-end space-x-2">
                 <button
                   type="button"
@@ -338,9 +449,8 @@ const Users = () => {
                   Cancel
                 </button>
                 <button
-                  type="button"
+                  type="submit"
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 flex items-center"
-                  onClick={handleAddUser}
                   disabled={loading}
                 >
                   {loading && (
@@ -349,78 +459,98 @@ const Users = () => {
                   {editUserId ? "Update" : "Add"}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
       <div className="bg-white p-6 rounded-lg shadow-md">
-        {loading && userList.length === 0 ? (
+        {loading && (!userList || userList.length === 0) ? (
           <div className="flex justify-center items-center py-8">
             <Loader className="animate-spin mr-2" size={24} />
             <span>Loading users...</span>
           </div>
         ) : (
-          <table className="min-w-full">
-            <thead>
-              <tr>
-                <th className="py-2 text-left text-gray-600">Name</th>
-                <th className="py-2 text-left text-gray-600">Points</th>
-                <th className="py-2 text-left text-gray-600">Status</th>
-                <th className="py-2 text-left text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {userList
-                .filter(
-                  (user) =>
-                    `${user.firstName} ${user.lastName}`
-                      .toLowerCase()
-                      .includes(search.toLowerCase()) ||
-                    user.email.toLowerCase().includes(search.toLowerCase())
-                )
-                .map((user) => (
-                  <tr key={user.id} className="border-t">
-                    <td className="py-3">
-                      <div className="font-semibold">
-                        {user.firstName} {user.lastName}
-                      </div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
-                    </td>
-                    <td className="py-3">{user.points || 0}</td>
-                    <td className="py-3">
-                      <span
-                        className={`px-2 py-1 text-sm rounded-full ${
-                          user.status === "Active"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex space-x-2">
-                        <button
-                          className="text-gray-500 hover:text-blue-600 disabled:opacity-50"
-                          onClick={() => handleEditClick(user)}
-                          disabled={loading}
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          className="text-gray-500 hover:text-red-600 disabled:opacity-50"
-                          onClick={() => handleDeleteClick(user.id)}
-                          disabled={loading}
-                        >
-                          <Trash size={18} />
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No users found.{" "}
+                {userList.length > 0 &&
+                  "All users may be admins or filtered out."}
+              </div>
+            ) : (
+              <table className="min-w-full">
+                <thead>
+                  <tr>
+                    <th className="py-2 text-left text-gray-600">Name</th>
+                    <th className="py-2 text-left text-gray-600">Email</th>
+                    <th className="py-2 text-left text-gray-600">Role</th>
+                    <th className="py-2 text-left text-gray-600">Points</th>
+                    <th className="py-2 text-left text-gray-600">Actions</th>
                   </tr>
-                ))}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="border-t">
+                      <td className="py-3">
+                        <div className="font-semibold">
+                          {user.firstName} {user.lastName}
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <div className="text-sm text-gray-600">
+                          {user.email}
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`px-2 py-1 text-sm rounded-full ${
+                            user.role === "admin"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <span className="font-medium">
+                          {getUserPoints(user)}
+                        </span>
+                        <div className="text-xs text-gray-500">
+                          Debug:{" "}
+                          {JSON.stringify({
+                            pointBalance: user.pointBalance,
+                            points: user.points,
+                            point_balance: user.point_balance,
+                            totalPoints: user.totalPoints,
+                          })}
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex space-x-2">
+                          <button
+                            className="text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                            onClick={() => handleEditClick(user)}
+                            disabled={loading}
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            className="text-gray-500 hover:text-red-600 disabled:opacity-50"
+                            onClick={() => handleDeleteClick(user.id)}
+                            disabled={loading}
+                          >
+                            <Trash size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
       </div>
     </div>
