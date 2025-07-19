@@ -1,10 +1,36 @@
 import { Plus, Trash, Edit, Loader } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-const API_BASE_URL = "https://ncs-bpb4.onrender.com";
+// Static mode: no backend API
 
 const Users = () => {
-  const [userList, setUserList] = useState([]);
+  // Initial static users
+  const [userList, setUserList] = useState([
+    {
+      id: 1,
+      firstName: "John",
+      lastName: "Doe",
+      email: "john.doe@example.com",
+      pointBalance: 100,
+      role: "user",
+    },
+    {
+      id: 2,
+      firstName: "Jane",
+      lastName: "Smith",
+      email: "jane.smith@example.com",
+      pointBalance: 200,
+      role: "user",
+    },
+    {
+      id: 3,
+      firstName: "Admin",
+      lastName: "User",
+      email: "admin@example.com",
+      pointBalance: 0,
+      role: "admin",
+    },
+  ]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     firstName: "",
@@ -18,9 +44,7 @@ const Users = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // You'll need to replace this with your actual auth token
-  const authToken =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJkc2xrTnhsY2tzbmR4bHZrbnNmQGdtYWlsLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1MTM2MDgwMSwiZXhwIjoxNzUxNDQ3MjAxfQ.icW5oe6WXImYodjoMt9_ByN87LVRrMikkLuRSwxi3Gk";
+  // No auth token needed in static mode
 
   // Helper function to get points value from user object
   const getUserPoints = (user) => {
@@ -28,139 +52,26 @@ const Users = () => {
     return user.pointBalance || 0;
   };
 
-  // Fetch users from backend
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      console.log("Fetching users...");
-
-      const response = await fetch(`${API_BASE_URL}/user/all`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Users fetched successfully:", data);
-      console.log(response.data);
-      console.log("Sample user object:", data.data?.[0]); // Debug: log first user to see field names
-
-      // Handle the API response structure: {message: '...', total: 24, data: Array(10)}
-      if (data && Array.isArray(data.data)) {
-        setUserList(data.data);
-        console.log(Array.isArray(data.data));
-        console.log("wfxvbwvcbgwc", data.data);
-      }
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setError("Failed to fetch users. Using fallback data.");
-
-      // Fallback to mock data if API fails
-      // eslint-disable-next-line no-undef
-      //setUserList(data.data);
-    } finally {
-      setLoading(false);
-    }
+  // No backend fetch in static mode
+  const fetchUsers = () => {
+    // Optionally, could reset to initial static users
+    setUserList((prev) => [...prev]);
+    setLoading(false);
   };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Static create user: just return a mock result
   const createUser = async (userData) => {
-    try {
-      console.log("Creating user with data:", userData);
-
-      const response = await fetch(`${API_BASE_URL}/user/create`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          email: userData.email,
-          password: userData.password,
-          role: userData.role,
-        }),
-      });
-
-      console.log("Create user response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Create user error:", errorData);
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${
-            errorData.message || "Unknown error"
-          }`
-        );
-      }
-
-      // Handle both cases: API returns data or empty response
-      let result;
-      try {
-        result = await response.json();
-        console.log("User created successfully with response:", result);
-      } catch (jsonError) {
-        // If no JSON response, create a mock result
-        console.log("No JSON response, user likely created successfully");
-        result = { success: true };
-      }
-
-      return result;
-    } catch (err) {
-      console.error("Error creating user:", err);
-      throw err;
-    }
+    return { id: Date.now(), ...userData };
   };
 
+  // Static update user: no backend
   const updateUser = async (userId, userData) => {
-    try {
-      console.log("Updating user:", userId, "with data:", userData);
-
-      const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: userData.email,
-        }),
-      });
-
-      console.log("Update user response status:", response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Update user error:", errorData);
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${
-            errorData.message || "Unknown error"
-          }`
-        );
-      }
-
-      const result = await response.json().catch(() => ({}));
-      console.log("User updated successfully:", result);
-      return result;
-    } catch (err) {
-      console.error("Error updating user:", err);
-      throw err;
-    }
+    return { id: userId, ...userData };
   };
 
   const handleAddUser = async (e) => {
@@ -216,16 +127,7 @@ const Users = () => {
           return [...currentList, newUser];
         });
 
-        // Try to refresh the user list to sync with backend (but don't wait for it)
-        setTimeout(async () => {
-          try {
-            await fetchUsers();
-            console.log("User list refreshed successfully");
-          } catch (refreshError) {
-            console.error("Failed to refresh user list:", refreshError);
-            // The user is already added to local state, so this is just for sync
-          }
-        }, 1000); // Small delay to allow backend to process
+        // No backend refresh needed in static mode
       }
 
       // Clear form and close modal
@@ -282,32 +184,11 @@ const Users = () => {
 
   const handleDeleteClick = async (userId) => {
     if (window.confirm("Are you sure you want to delete this user?")) {
-      try {
-        // Make API call to delete from database
-        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            // Include authorization token if needed
-            // 'Authorization': `Bearer ${yourAuthToken}`
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to delete user");
-        }
-
-        // Only update the local state if the database deletion was successful
-        setUserList((prevList) =>
-          Array.isArray(prevList)
-            ? prevList.filter((user) => user.id !== userId)
-            : []
-        );
-      } catch (error) {
-        console.error("Error deleting user:", error);
-        // Optionally show an error message to the user
-        alert("Failed to delete user. Please try again.");
-      }
+      setUserList((prevList) =>
+        Array.isArray(prevList)
+          ? prevList.filter((user) => user.id !== userId)
+          : []
+      );
     }
   };
   // Filter to only show users (not admins)
